@@ -1,0 +1,18 @@
+{
+  "name": "tesla-run",
+  "version": "1.0.0",
+  "description": "3D 跑酷游戏：驾驶会飞的特斯拉，空格触发空中翻滚喷气越障",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node serve.mjs"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1"
+  }
+}

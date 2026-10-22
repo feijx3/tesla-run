@@ -1,0 +1,5 @@
+node_modules/
+dist/
+# 原始下载的高面数车模（34.5 MB），游戏只用压缩后的 assets/roadster.glb
+assets/source/
+.claude/

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>TESLA RUN · 喷气翻滚跑酷</title>
+<style>
+  :root {
+    --red: #e82127;
+    --cyan: #5ad2ff;
+    --pink: #ff3fb0;
+    --ink: #f3f5f8;
+    --dim: rgba(243, 245, 248, 0.62);
+    --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05030c; color: var(--ink); font-family: var(--font); }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  /* ───── HUD ───── */
+  #hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  body.playing #hud { opacity: 1; }
+  .tl { position: absolute; top: 22px; left: 28px; }
+  .tr { position: absolute; top: 22px; right: 28px; text-align: right; display: flex; gap: 26px; }
+  .big { font-size: clamp(34px, 5vw, 56px); font-weight: 200; letter-spacing: .04em; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(90, 210, 255, .35); }
+  .lbl { font-size: 11px; letter-spacing: .32em; color: var(--dim); text-transform: uppercase; margin-top: 6px; }
+  .stat .big { font-size: clamp(24px, 3vw, 34px); }
+  #best { font-size: 12px; letter-spacing: .2em; color: var(--dim); margin-top: 10px; }
+  #combo { position: absolute; top: 104px; left: 28px; font-size: 20px; font-weight: 600; letter-spacing: .18em; color: #ffd24a; text-shadow: 0 0 16px rgba(255, 190, 40, .6); opacity: 0; transition: opacity .25s, transform .25s; transform: translateX(-8px); }
+  #combo.on { opacity: 1; transform: none; }
+
+  #energy { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); width: min(460px, 70vw); text-align: center; }
+  #energy .bar { position: relative; height: 10px; border-radius: 6px; background: rgba(255, 255, 255, .1); overflow: hidden; border: 1px solid rgba(255, 255, 255, .18); }
+  #energyFill { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 6px; background: linear-gradient(90deg, #2ea8ff, #5ad2ff 60%, #d8f6ff); box-shadow: 0 0 16px rgba(90, 210, 255, .8); transition: width .08s linear; }
+  #energy .tick { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: rgba(5, 3, 12, .9); }
+  #energy .cap { margin-top: 10px; font-size: 12px; letter-spacing: .34em; color: var(--dim); }
+  #energy .cap b { color: var(--ink); font-weight: 600; }
+  #energy.ready .cap b { color: var(--cyan); text-shadow: 0 0 12px rgba(90, 210, 255, .8); }
+  #energy.deny .bar { border-color: var(--red); animation: shake .25s; }
+  #energy.deny #energyFill { background: var(--red); box-shadow: 0 0 16px rgba(232, 33, 39, .9); }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+  #popups { position: absolute; left: 50%; top: 32%; transform: translateX(-50%); width: 0; }
+  .pop { position: absolute; left: 0; transform: translateX(-50%); white-space: nowrap; font-size: clamp(22px, 3vw, 34px); font-weight: 700; letter-spacing: .14em; color: #fff; text-shadow: 0 0 18px var(--cyan), 0 0 40px var(--cyan); animation: pop 1.2s ease-out forwards; }
+  .pop.gold { color: #ffe27a; text-shadow: 0 0 18px #ffb020, 0 0 40px #ff8a00; }
+  .pop small { display: block; text-align: center; font-size: .5em; letter-spacing: .3em; font-weight: 400; margin-top: 4px; opacity: .85; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, 14px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -46px) scale(1); } }
+
+  #hint { position: fixed; left: 28px; bottom: 26px; font-size: 11px; letter-spacing: .16em; color: var(--dim); line-height: 1.9; opacity: 0; transition: opacity .4s; }
+  body.playing #hint { opacity: .75; }
+  #hint kbd { display: inline-block; min-width: 22px; padding: 0 6px; margin-right: 4px; text-align: center; border: 1px solid rgba(255, 255, 255, .35); border-radius: 4px; font-family: inherit; font-size: 10px; letter-spacing: 0; }
+
+  /* ───── 覆盖层 ───── */
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+  .overlay.show { display: flex; }
+  #start { justify-content: flex-end; padding-bottom: 7vh; background: linear-gradient(180deg, rgba(5, 3, 12, .55) 0%, rgba(5, 3, 12, 0) 38%, rgba(5, 3, 12, 0) 55%, rgba(5, 3, 12, .82) 100%); }
+  #start .logo-wrap { position: absolute; top: 9vh; left: 0; right: 0; }
+  .logo { font-size: clamp(44px, 9vw, 104px); font-weight: 200; letter-spacing: .42em; padding-left: .42em; background: linear-gradient(180deg, #fff 30%, #c8cdd6 70%, #7b8290); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 28px rgba(232, 33, 39, .35)); }
+  .logo em { font-style: normal; background: linear-gradient(180deg, #ff5a5f, var(--red)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { margin-top: 10px; font-size: clamp(12px, 1.6vw, 16px); letter-spacing: .5em; padding-left: .5em; color: var(--dim); }
+  .cta { font-size: clamp(14px, 1.8vw, 18px); letter-spacing: .4em; padding-left: .4em; animation: blink 1.6s ease-in-out infinite; }
+  .cta b { color: var(--cyan); }
+  @keyframes blink { 50% { opacity: .4; } }
+  .controls { margin-top: 22px; display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; font-size: 12px; letter-spacing: .2em; color: var(--dim); }
+  .controls kbd { display: inline-block; padding: 2px 8px; margin-right: 6px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 5px; font-family: inherit; color: var(--ink); }
+  .paint { margin-top: 18px; font-size: 12px; letter-spacing: .26em; color: var(--dim); }
+  .paint b { color: var(--ink); }
+  body.custom-car .paint-ctl { display: none; }
+  .credit { position: fixed; left: 16px; bottom: 12px; font-size: 10px; letter-spacing: .06em; color: rgba(243, 245, 248, .45); text-align: left; }
+
+  #over, #pause { background: radial-gradient(ellipse at center, rgba(5, 3, 12, .35), rgba(5, 3, 12, .85)); }
+  #over h2, #pause h2 { font-size: clamp(26px, 4.6vw, 52px); font-weight: 200; letter-spacing: .4em; padding-left: .4em; }
+  #over h2 { color: #ff4a50; letter-spacing: .12em; padding-left: .12em; max-width: 92vw; text-shadow: 0 0 30px rgba(232, 33, 39, .55); }
+  .result { margin: 26px 0 8px; display: flex; gap: 46px; justify-content: center; }
+  .result div { min-width: 90px; }
+  .result .big { font-size: clamp(30px, 5vw, 52px); }
+  #newBest { margin-top: 10px; color: #ffe27a; letter-spacing: .3em; font-size: 13px; text-shadow: 0 0 14px rgba(255, 190, 40, .7); min-height: 18px; }
+  #over .cta { margin-top: 34px; }
+
+  #mute { position: fixed; right: 22px; bottom: 22px; font-size: 11px; letter-spacing: .2em; color: var(--dim); pointer-events: auto; cursor: pointer; padding: 6px 10px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; }
+  #mute:hover { color: var(--ink); border-color: rgba(255, 255, 255, .5); }
+  #fatal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; line-height: 1.8; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div class="tl">
+    <div class="big" id="score">0</div>
+    <div class="lbl">分数 · SCORE</div>
+    <div id="best"></div>
+  </div>
+  <div id="combo"></div>
+  <div class="tr">
+    <div class="stat"><div class="big" id="cells">0</div><div class="lbl">电芯 · CELLS</div></div>
+    <div class="stat"><div class="big" id="kmh">0</div><div class="lbl">KM/H</div></div>
+  </div>
+  <div id="popups"></div>
+  <div id="energy" class="ready">
+    <div class="bar"><div id="energyFill"></div><div class="tick"></div></div>
+    <div class="cap"><b>SPACE</b> · 喷气后空翻</div>
+  </div>
+</div>
+
+<div id="hint">
+  <div><kbd>←</kbd><kbd>→</kbd> 变道（A / D）</div>
+  <div><kbd>空格</kbd> 后空翻喷气 · 空中再按侧滚</div>
+  <div><kbd>P</kbd> 暂停<span class="paint-ctl">　<kbd>C</kbd> 换色</span></div>
+</div>
+
+<div class="overlay show" id="start">
+  <div class="logo-wrap">
+    <div class="logo">TESLA<em>RUN</em></div>
+    <div class="sub">收费站拦不住会飞的车</div>
+  </div>
+  <div class="cta">按 <b>空格</b> 起飞</div>
+  <div class="controls">
+    <span><kbd>← →</kbd>变道</span>
+    <span><kbd>空格</kbd>喷气后空翻（空中再按一次：侧滚）</span>
+    <span class="paint-ctl"><kbd>C</kbd>换色</span>
+    <span><kbd>M</kbd>静音</span>
+    <span><kbd>P</kbd>暂停</span>
+  </div>
+  <div class="paint paint-ctl">车漆 · <b id="paintName">珍珠白</b></div>
+  <div class="credit" id="credit"></div>
+</div>
+
+<div class="overlay" id="over">
+  <h2 id="overTitle">撞毁</h2>
+  <div class="result">
+    <div><div class="big" id="finalScore">0</div><div class="lbl">分数</div></div>
+    <div><div class="big" id="finalCells">0</div><div class="lbl">电芯</div></div>
+    <div><div class="big" id="finalClears">0</div><div class="lbl">飞越</div></div>
+  </div>
+  <div id="newBest"></div>
+  <div class="cta">按 <b>空格</b> 再来一次</div>
+</div>
+
+<div class="overlay" id="pause">
+  <h2>暂停</h2>
+  <div class="cta" style="margin-top:30px">按 <b>P</b> 或 <b>空格</b> 继续</div>
+</div>
+
+<div id="mute">♪ 声音 开 · M</div>
+<div id="fatal"></div>
+
+<!--GAME_SCRIPT-->
+</body>
+</html>
